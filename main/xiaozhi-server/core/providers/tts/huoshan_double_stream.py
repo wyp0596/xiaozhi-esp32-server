@@ -7,6 +7,7 @@ import traceback
 from typing import Callable, Any
 import websockets
 from core.utils.tts import MarkdownCleaner
+from core.utils.language_detector import LanguageDetector
 from config.logger import setup_logging
 from core.utils import opus_encoder_utils
 from core.utils.util import check_model_key
@@ -602,6 +603,11 @@ class TTSProvider(TTSProviderBase):
         audio_format="pcm",
         audio_sample_rate=16000,
     ):
+        # 动态检测语言
+        detected_language = LanguageDetector.detect_language(text) if text else "cn"
+        if text:
+            logger.bind(tag=TAG).debug(f"检测到语言: {detected_language}, 文本: {text[:50]}...")
+
         return str.encode(
             json.dumps(
                 {
@@ -615,7 +621,8 @@ class TTSProvider(TTSProviderBase):
                             "format": audio_format,
                             "sample_rate": audio_sample_rate,
                             "speech_rate": self.speech_rate,
-                            "loudness_rate": self.loudness_rate
+                            "loudness_rate": self.loudness_rate,
+                            "language": detected_language
                         },
                     },
                     "additions": {

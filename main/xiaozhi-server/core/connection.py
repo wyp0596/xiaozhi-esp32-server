@@ -1049,6 +1049,69 @@ class ConnectionHandler:
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Chat and close error: {str(e)}")
 
+    def push_message_to_client(self, text):
+        """服务端主动推送消息让客户端说话"""
+        # 检查WebSocket连接状态
+        if not self.websocket:
+            self.logger.bind(tag=TAG).warning("WebSocket连接不存在，无法发送消息")
+            return False
+            
+        # 安全地检查WebSocket状态
+        try:
+            if hasattr(self.websocket, 'closed') and self.websocket.closed:
+                self.logger.bind(tag=TAG).warning("WebSocket连接已关闭，无法发送消息")
+                return False
+            elif hasattr(self.websocket, 'state') and self.websocket.state.name == "CLOSED":
+                self.logger.bind(tag=TAG).warning("WebSocket连接已关闭，无法发送消息")
+                return False
+        except Exception as e:
+            self.logger.bind(tag=TAG).warning(f"检查WebSocket状态时出错: {e}")
+            return False
+        
+        if not self.tts:
+            self.logger.bind(tag=TAG).warning("TTS服务未初始化，无法发送语音消息")
+            return False
+        
+        try:
+            # 创建新的句子ID
+            sentence_id = str(uuid.uuid4().hex)
+            self.sentence_id = sentence_id
+            
+            # 发送FIRST消息开始TTS流程
+            self.tts.tts_text_queue.put(
+                TTSMessageDTO(
+                    sentence_id=sentence_id,
+                    sentence_type=SentenceType.FIRST,
+                    content_type=ContentType.ACTION,
+                )
+            )
+            
+            # 发送文本内容
+            self.tts.tts_text_queue.put(
+                TTSMessageDTO(
+                    sentence_id=sentence_id,
+                    sentence_type=SentenceType.MIDDLE,
+                    content_type=ContentType.TEXT,
+                    content_detail=text,
+                )
+            )
+            
+            # 发送LAST消息结束TTS流程
+            self.tts.tts_text_queue.put(
+                TTSMessageDTO(
+                    sentence_id=sentence_id,
+                    sentence_type=SentenceType.LAST,
+                    content_type=ContentType.ACTION,
+                )
+            )
+            
+            self.logger.bind(tag=TAG).info(f"已推送消息到客户端 {self.device_id}: {text}")
+            return True
+        except Exception as e:
+            self.logger.bind(tag=TAG).error(f"推送消息到客户端 {self.device_id} 失败: {e}")
+            self.logger.bind(tag=TAG).debug(f"错误详情: {traceback.format_exc()}")
+            return False
+
     async def _check_timeout(self):
         """检查连接超时"""
         try:

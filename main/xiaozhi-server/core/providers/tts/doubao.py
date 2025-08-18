@@ -3,6 +3,7 @@ import json
 import base64
 import requests
 from core.utils.util import check_model_key
+from core.utils.language_detector import LanguageDetector
 from core.providers.tts.base import TTSProviderBase
 from config.logger import setup_logging
 
@@ -42,6 +43,10 @@ class TTSProvider(TTSProviderBase):
             logger.bind(tag=TAG).error(model_key_msg)
 
     async def text_to_speak(self, text, output_file):
+        # 动态检测语言
+        detected_language = LanguageDetector.detect_language(text)
+        logger.bind(tag=TAG).debug(f"检测到语言: {detected_language}, 文本: {text[:50]}...")
+        
         request_json = {
             "app": {
                 "appid": f"{self.appid}",
@@ -55,6 +60,7 @@ class TTSProvider(TTSProviderBase):
                 "speed_ratio": self.speed_ratio,
                 "volume_ratio": self.volume_ratio,
                 "pitch_ratio": self.pitch_ratio,
+                "language": detected_language,
             },
             "request": {
                 "reqid": str(uuid.uuid4()),

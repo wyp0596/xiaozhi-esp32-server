@@ -136,3 +136,51 @@ class WebSocketServer:
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"更新服务器配置失败: {str(e)}")
             return False
+
+    async def broadcast_message_to_all(self, text):
+        """向所有连接的客户端广播消息"""
+        if not self.active_connections:
+            self.logger.bind(tag=TAG).info("没有活跃的连接，无法广播消息")
+            return 0
+        
+        success_count = 0
+        total_connections = len(self.active_connections)
+        
+        # 创建连接的副本以避免迭代时修改
+        connections_copy = self.active_connections.copy()
+        
+        for handler in connections_copy:
+            try:
+                # 检查handler是否有效
+                if not hasattr(handler, 'device_id'):
+                    self.logger.bind(tag=TAG).warning("发现无效的连接处理器，跳过")
+                    continue
+                    
+                if handler.push_message_to_client(text):
+                    success_count += 1
+            except Exception as e:
+                device_id = getattr(handler, 'device_id', 'unknown')
+                self.logger.bind(tag=TAG).error(f"向客户端 {device_id} 广播消息失败: {e}")
+                # 如果需要详细错误信息，可以取消下面的注释
+                # import traceback
+                # self.logger.bind(tag=TAG).debug(f"广播错误详情: {traceback.format_exc()}")
+        
+        self.logger.bind(tag=TAG).info(f"广播消息完成: 成功 {success_count}/{total_connections} 个连接")
+        return success_count
+
+    async def send_message_to_device(self, device_id, text):
+        """向指定设备发送消息"""
+        target_handler = None
+        for handler in self.active_connections:
+            if handler.device_id == device_id:
+                target_handler = handler
+                break
+        
+        if target_handler:
+            success = target_handler.push_message_to_client(text)
+            if success:
+                self.logger.bind(tag=TAG).info(f"已向设备 {device_id} 发送消息: {text}")
+            return success
+        else:
+            self.logger.bind(tag=TAG).warning(f"设备 {device_id} 未找到或未连接")
+            return False
