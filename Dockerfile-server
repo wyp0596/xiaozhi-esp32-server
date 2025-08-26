@@ -13,14 +13,22 @@ FROM python:3.10-slim
 
 WORKDIR /opt/xiaozhi-esp32-server
 
-# 更换系统源为阿里云并安装依赖
-RUN sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list && \
+# 更换系统源为阿里云（适配Debian 12+的sources.list.d目录）
+RUN if [ -d "/etc/apt/sources.list.d" ]; then \
+        echo "deb https://mirrors.aliyun.com/debian/ bookworm main non-free contrib" > /etc/apt/sources.list.d/aliyun.list && \
+        echo "deb https://mirrors.aliyun.com/debian-security/ bookworm-security main" >> /etc/apt/sources.list.d/aliyun.list && \
+        echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main non-free contrib" >> /etc/apt/sources.list.d/aliyun.list && \
+        echo "deb https://mirrors.aliyun.com/debian/ bookworm-backports main non-free contrib" >> /etc/apt/sources.list.d/aliyun.list; \
+    else \
+        # 兼容旧版本Debian
+        sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list; \
+    fi && \
     apt-get update && \
     apt-get install -y --no-install-recommends libopus0 ffmpeg && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 从构建阶段复制Python包和前端构建产物
+# 从构建阶段复制Python包
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin/mcp-proxy /usr/local/bin/mcp-proxy
 
