@@ -5,16 +5,17 @@ WORKDIR /app
 
 COPY main/xiaozhi-server/requirements.txt .
 
-# 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 更换pip国内镜像源（阿里云）并安装依赖
+RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 
 # 第二阶段：生产镜像
 FROM python:3.10-slim
 
 WORKDIR /opt/xiaozhi-esp32-server
 
-# 安装系统依赖
-RUN apt-get update && \
+# 更换系统源为阿里云并安装依赖
+RUN sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list && \
+    apt-get update && \
     apt-get install -y --no-install-recommends libopus0 ffmpeg && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
